@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏭 Pakistani Industrial Cloud - Render</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { 
+            background: rgba(255,255,255,0.95); 
+            padding: 25px; 
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        .card { 
+            background: rgba(255,255,255,0.95); 
+            padding: 25px; 
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .status { 
+            display: inline-block; 
+            padding: 8px 16px; 
+            border-radius: 25px; 
+            color: white; 
+            margin: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .connected { background: #00b894; } 
+        .disconnected { background: #d63031; }
+        .warning { background: #fdcb6e; color: #2d3436; }
+        .data-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 15px; 
+            margin-top: 15px;
+        }
+        .data-item { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .factory-item {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border-left: 4px solid #00b894;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .factory-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .factory-item.offline {
+            border-left-color: #d63031;
+            opacity: 0.7;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        button:disabled {
+            background: #b2bec3;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .live-badge {
+            background: #e17055;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2d3436;
+            margin: 5px 0;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #636e72;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .server-info {
+            background: #dfe6e9;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .last-update {
+            font-size: 12px;
+            color: #636e72;
+            text-align: right;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏭 Pakistani Industrial Cloud</h1>
+            <p>Real-time Factory Monitoring - Powered by Render</p>
+            <div id="connectionStatus" class="status disconnected">Disconnected from Cloud</div>
+            <button onclick="connectToCloud()">🔄 Connect to Cloud</button>
+            <button onclick="getFactories()">📡 Refresh Factories</button>
+            <div id="serverStats" class="server-info">
+                <div>Cloud Server: <strong id="serverUrl">Not connected</strong></div>
+                <div>Status: <span id="serverStatus">Offline</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🏭 Connected Factories <span id="factoryCount" class="live-badge">0</span></h2>
+            <div id="factoriesList">
+                <div class="factory-item">
+                    <h3>No factories connected</h3>
+                    <p>Connect your ESP8266 to see factories here</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="liveDataCard" style="display: none;">
+            <h2>📊 Live Factory Data <span class="live-badge">LIVE</span></h2>
+            <div id="currentFactoryInfo"></div>
+            <div class="data-grid" id="liveData"></div>
+            <div class="last-update" id="lastUpdate">Last update: Never</div>
+        </div>
+
+        <div class="card">
+            <h2>📈 System Overview</h2>
+            <div class="data-grid">
+                <div class="data-item">
+                    <div class="metric-value" id="totalFactories">0</div>
+                    <div class="metric-label">Total Factories</div>
+                </div>
+                <div class="data-item">
+                    <div class="metric-value" id="connectedClients">0</div>
+                    <div class="metric-label">Connected Clients</div>
+                </div>
+                <div class="data-item">
+                    <div class="metric-value" id="dataUpdates">0</div>
+                    <div class="metric-label">Data Updates</div>
+                </div>
+                <div class="data-item">
+                    <div class="metric-value" id="uptime">0s</div>
+                    <div class="metric-label">Server Uptime</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentFactory = null;
+        let dataUpdateCount = 0;
+        let serverStartTime = Date.now();
+        let connectedClients = 0;
+        let currentServerUrl = '';
+
+        function connectToCloud() {
+            // Get the current domain for WebSocket connection
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            currentServerUrl = `${protocol}//${window.location.host}`;
+            
+            console.log('🌐 Connecting to:', currentServerUrl);
+            
+            ws = new WebSocket(currentServerUrl);
+            
+            ws.onopen = () => {
+                document.getElementById('connectionStatus').className = 'status connected';
+                document.getElementById('connectionStatus').textContent = 'Connected to Cloud';
+                document.getElementById('serverUrl').textContent = currentServerUrl;
+                document.getElementById('serverStatus').innerHTML = '<span style="color: green;">Online</span>';
+                console.log('✅ Connected to Pakistani Industrial Cloud');
+                
+                // Start periodic pings
+                setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 30000);
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleCloudMessage(data);
+                } catch (error) {
+                    console.error('❌ Message parse error:', error);
+                }
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('connectionStatus').className = 'status disconnected';
+                document.getElementById('connectionStatus').textContent = 'Disconnected from Cloud';
+                document.getElementById('serverStatus').innerHTML = '<span style="color: red;">Offline</span>';
+                console.log('❌ Disconnected from cloud');
+            };
+            
+            ws.onerror = (error) => {
+                console.error('❌ WebSocket error:', error);
+                document.getElementById('serverStatus').innerHTML = '<span style="color: red;">Connection Error</span>';
+            };
+        }
+
+        function handleCloudMessage(data) {
+            switch(data.type) {
+                case 'welcome':
+                    console.log('☁️ Cloud:', data.message);
+                    connectedClients = data.connectedClients || 0;
+                    updateServerStats();
+                    break;
+                    
+                case 'factory_list':
+                    displayFactories(data.factories);
+                    break;
+                    
+                case 'realtime_data':
+                    dataUpdateCount++;
+                    displayLiveData(data);
+                    updateServerStats();
+                    document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+                    break;
+                    
+                case 'subscribed':
+                    currentFactory = data.machineId;
+                    document.getElementById('liveDataCard').style.display = 'block';
+                    displayLiveData(data);
+                    break;
+                    
+                case 'factory_connected':
+                    console.log('🏭 New factory connected:', data.factory.factoryId);
+                    getFactories();
+                    break;
+                    
+                case 'factory_disconnected':
+                    console.log('🏭 Factory disconnected:', data.factoryId);
+                    if (currentFactory === data.machineId) {
+                        document.getElementById('liveDataCard').style.display = 'none';
+                        currentFactory = null;
+                    }
+                    getFactories();
+                    break;
+                    
+                case 'pong':
+                    // Connection is alive
+                    break;
+            }
+        }
+
+        function getFactories() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_factories' }));
+            }
+        }
+
+        function displayFactories(factories) {
+            const list = document.getElementById('factoriesList');
+            const count = document.getElementById('factoryCount');
+            
+            count.textContent = factories.length;
+            document.getElementById('totalFactories').textContent = factories.length;
+            
+            if (factories.length === 0) {
+                list.innerHTML = '<div class="factory-item"><h3>No factories connected</h3><p>Waiting for ESP8266 connections...</p></div>';
+                return;
+            }
+            
+            list.innerHTML = '';
+            
+            factories.forEach(factory => {
+                const isOnline = factory.connected;
+                const timeAgo = Math.floor((Date.now() - factory.lastSeen) / 1000);
+                
+                const div = document.createElement('div');
+                div.className = `factory-item ${isOnline ? '' : 'offline'}`;
+                div.innerHTML = `
+                    <h3>${factory.location} (${factory.factoryId})</h3>
+                    <p>ID: ${factory.machineId}</p>
+                    <p>Status: <span class="status ${isOnline ? 'connected' : 'disconnected'}">${isOnline ? 'Online' : 'Offline'}</span></p>
+                    <p>PLC: <span class="status ${factory.plcConnected ? 'connected' : 'disconnected'}">${factory.plcConnected ? 'Connected' : 'Disconnected'}</span></p>
+                    <p>Last seen: ${timeAgo < 60 ? `${timeAgo} seconds ago` : `${Math.floor(timeAgo/60)} minutes ago`}</p>
+                    <button onclick="subscribeToFactory('${factory.machineId}')" ${!isOnline ? 'disabled' : ''}>
+                        ${isOnline ? '📡 Monitor Live' : '🔴 Offline'}
+                    </button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function subscribeToFactory(machineId) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ 
+                    type: 'subscribe', 
+                    machineId: machineId 
+                }));
+            }
+        }
+
+        function displayLiveData(data) {
+            const container = document.getElementById('liveData');
+            const factoryInfo = document.getElementById('currentFactoryInfo');
+            
+            if (data.factoryId) {
+                factoryInfo.innerHTML = `
+                    <h3>🏭 ${data.factoryId} - ${data.location || 'Factory'}</h3>
+                    <p>Monitoring live data stream</p>
+                `;
+            }
+            
+            if (data.data) {
+                let html = '';
+                const metrics = data.data;
+                
+                // Critical metrics first
+                const criticalMetrics = ['SheetsComplete', 'OutputCurrent', 'OutputFrequency', 'RotationSpeed', 'MaxCurrent'];
+                const otherMetrics = Object.keys(metrics).filter(key => !criticalMetrics.includes(key));
+                
+                criticalMetrics.forEach(key => {
+                    if (metrics[key] !== undefined) {
+                        html += createMetricCard(key, metrics[key]);
+                    }
+                });
+                
+                otherMetrics.forEach(key => {
+                    if (metrics[key] !== undefined && 
+                        key !== 'PLCConnected' && 
+                        key !== 'WifiConnected' && 
+                        key !== 'CloudConnected' &&
+                        key !== 'ActiveUsers' &&
+                        key !== 'MaxUsers') {
+                        html += createMetricCard(key, metrics[key]);
+                    }
+                });
+                
+                // System status
+                if (metrics.PLCConnected !== undefined || metrics.WifiConnected !== undefined) {
+                    html += `
+                        <div class="data-item" style="grid-column: 1 / -1; background: #e8f4fd;">
+                            <h4>System Status</h4>
+                            <span class="status ${metrics.PLCConnected ? 'connected' : 'disconnected'}">PLC: ${metrics.PLCConnected ? 'Connected' : 'Disconnected'}</span>
+                            <span class="status ${metrics.WifiConnected ? 'connected' : 'disconnected'}">WiFi: ${metrics.WifiConnected ? 'Connected' : 'Disconnected'}</span>
+                            <span class="status ${metrics.CloudConnected ? 'connected' : 'disconnected'}">Cloud: ${metrics.CloudConnected ? 'Connected' : 'Disconnected'}</span>
+                            ${metrics.ActiveUsers !== undefined ? `<span class="status warning">Users: ${metrics.ActiveUsers}/${metrics.MaxUsers || 10}</span>` : ''}
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = html;
+            }
+        }
+
+        function createMetricCard(label, value) {
+            let formattedValue = value;
+            let unit = '';
+            let color = '#667eea';
+            
+            // Format values based on label
+            if (label.includes('Current')) { unit = 'A'; color = '#e17055'; }
+            if (label.includes('Frequency')) { unit = 'Hz'; color = '#00b894'; }
+            if (label.includes('Speed')) { unit = 'RPM'; color = '#0984e3'; }
+            if (label.includes('Sheets')) { unit = 'sheets'; color = '#a29bfe'; }
+            if (label.includes('Size')) { unit = 'mm'; color = '#fd79a8'; }
+            
+            return `
+                <div class="data-item" style="border-left-color: ${color}">
+                    <div class="metric-label">${formatLabel(label)}</div>
+                    <div class="metric-value">${formattedValue} ${unit}</div>
+                </div>
+            `;
+        }
+
+        function formatLabel(label) {
+            return label
+                .replace(/([A-Z])/g, ' $1')
+                .replace(/^./, str => str.toUpperCase())
+                .replace(/_/g, ' ')
+                .trim();
+        }
+
+        function updateServerStats() {
+            const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
+            const minutes = Math.floor(uptime / 60);
+            const hours = Math.floor(minutes / 60);
+            
+            let uptimeText = `${uptime}s`;
+            if (hours > 0) uptimeText = `${hours}h ${minutes % 60}m`;
+            else if (minutes > 0) uptimeText = `${minutes}m`;
+            
+            document.getElementById('uptime').textContent = uptimeText;
+            document.getElementById('dataUpdates').textContent = dataUpdateCount;
+            document.getElementById('connectedClients').textContent = connectedClients;
+        }
+
+        // Auto-connect when page loads
+        window.addEventListener('load', () => {
+            connectToCloud();
+            setInterval(updateServerStats, 1000);
+            
+            // Refresh factory list every 20 seconds
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    getFactories();
+                }
+            }, 20000);
+        });
+
+        // Health check
+        fetch('/health')
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Server health:', data);
+            })
+            .catch(error => {
+                console.error('❌ Health check failed:', error);
+            });
+    </script>
+</body>
+</html>
