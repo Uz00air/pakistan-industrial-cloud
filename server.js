@@ -4,9 +4,11 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
-app.use(express.static('public'));
 
-// Basic route - FIXED for Vercel
+// Remove this line if you're not using public directory:
+// app.use(express.static('public'));
+
+// Homepage route
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -38,7 +40,49 @@ app.get('/', (req, res) => {
   `);
 });
 
-// Health check endpoint
+// Dashboard route - serve the full HTML directly
+app.get('/dashboard', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>🏭 Pakistani Industrial Cloud - Dashboard</title>
+        <style>
+            /* Paste your full CSS here */
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+                color: #333;
+            }
+            /* ... rest of your CSS ... */
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <!-- Paste your full HTML body here -->
+            <div class="header">
+                <h1>🏭 Pakistani Industrial Cloud</h1>
+                <!-- ... rest of your HTML ... -->
+            </div>
+        </div>
+
+        <script>
+            // Paste your full JavaScript here
+            let ws = null;
+            let currentFactory = null;
+            // ... rest of your JavaScript ...
+        </script>
+    </body>
+    </html>
+  `);
+});
+
+// Keep the rest of your routes as they are...
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy',
@@ -49,55 +93,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Dashboard route
-app.get('/dashboard', (req, res) => {
-  res.sendFile(__dirname + '/public/dashboard.html');
-});
+// ... rest of your routes ...
 
-// ESP8266 API endpoints
-app.post('/api/connect', (req, res) => {
-  const { machineId, factoryId } = req.body;
-  
-  console.log(`🏭 Factory connecting: ${factoryId}`);
-  
-  res.json({
-    status: 'connected',
-    message: '✅ Successfully connected to Vercel Cloud',
-    machineId: machineId,
-    server: 'Vercel',
-    timestamp: Date.now()
-  });
-});
-
-app.post('/api/data', (req, res) => {
-  const { machineId, data } = req.body;
-  
-  console.log('📊 Received factory data');
-  
-  res.json({
-    status: 'received',
-    message: '✅ Data processed successfully',
-    dataPoints: data ? Object.keys(data).length : 0,
-    timestamp: Date.now()
-  });
-});
-
-// Catch-all route for Vercel
-app.get('*', (req, res) => {
-  res.json({
-    error: 'Route not found',
-    available_routes: [
-      'GET /',
-      'GET /health', 
-      'GET /dashboard',
-      'POST /api/connect',
-      'POST /api/data'
-    ]
-  });
-});
-
-// Start server
 app.listen(PORT, () => {
   console.log(`✅ Pakistani Industrial Cloud running on port ${PORT}`);
-  console.log(`📍 Server: Vercel`);
 });
